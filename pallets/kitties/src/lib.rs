@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use codec::{Encode, Decode};
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
 use frame_system::ensure_signed;
 
@@ -9,6 +10,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[derive(Encode, Decode)]
+pub struct Kitty([u8; 16]);
+
 pub trait Trait: frame_system::Trait {
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 }
@@ -17,7 +21,9 @@ pub trait Trait: frame_system::Trait {
 // https://substrate.dev/docs/en/knowledgebase/runtime/storage
 decl_storage! {
 	trait Store for Module<T: Trait> as Kitties {
-		Something get(fn something): Option<u32>;
+		pub Kitties get(fn kitties): double_map hasher(blake2_128_concat) T::AccountId, hasher(blake2_128_concat) u32 => Option<Kitty>;
+
+		pub NextKittyId get(fn next_kitty_id): u32;
 	}
 }
 
