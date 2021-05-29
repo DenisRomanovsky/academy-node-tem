@@ -26,6 +26,7 @@ serde = { features = ['derive'], optional = true, version = '1.0.119' }
 
 # local dependencies
 pallet-template = { path = '../pallets/template', default-features = false, version = '2.0.1' }
+pallet-kitties = { path='../pallets/kitties', default-features = false, version = '2.0.1'  }
 
 # Substrate dependencies
 frame-benchmarking = { default-features = false, optional = true, version = '2.0.1' }
@@ -93,4 +94,5 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
+    'pallet-kitties/std',
 ]

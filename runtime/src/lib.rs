@@ -40,6 +40,7 @@ pub use frame_support::{
 
 /// Import the template pallet.
 pub use pallet_template;
+pub use pallet_kitties;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -101,7 +102,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	transaction_version: 1,
 };
 
-pub const MILLISECS_PER_BLOCK: u64 = 6000;
+pub const MILLISECS_PER_BLOCK: u64 = 2000;
 
 pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 
@@ -266,6 +267,11 @@ impl pallet_template::Trait for Runtime {
 	type Event = Event;
 }
 
+/// Configure the template pallet in pallets/template.
+impl pallet_kitties::Trait for Runtime {
+	type Event = Event;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -283,6 +289,7 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the template pallet in the runtime.
 		TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
+		Kitties: pallet_kitties::{Module, Call, Storage, Event<T>},
 	}
 );
 
