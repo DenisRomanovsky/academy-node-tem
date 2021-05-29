@@ -1,8 +1,17 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{Encode, Decode};
-use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
+use frame_support::{decl_module,
+					decl_storage,
+					decl_event,
+					decl_error,
+					dispatch,
+					traits::{ Get, Randomness},
+					StorageValue,
+					StorageDoubleMap,
+					RuntimeDebug};
 use frame_system::ensure_signed;
+use sp_io::hashing::blake2_128;
 
 #[cfg(test)]
 mod mock;
@@ -10,7 +19,7 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
 pub struct Kitty([u8; 16]);
 
 pub trait Trait: frame_system::Trait {
@@ -30,10 +39,8 @@ decl_storage! {
 // Pallets use events to inform users when important changes are made.
 // https://substrate.dev/docs/en/knowledgebase/runtime/events
 decl_event!(
-	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, AccountId),
+	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId, {
+			KittyCreated(AccountId, u32, Kitty),
 	}
 );
 
@@ -50,5 +57,27 @@ decl_module! {
 		type Error = Error<T>;
 
 		fn deposit_event() = default;
+
+		#[weight = 1000]
+		pub fn create(origin) {
+			let sender = ensure_signed(origin)?;
+
+			let payload = (
+				<pallet_randomness_collective_flip::Module<T> as Randomness<T::Hash>>::random_seed(),
+				&sender,
+				<frame_system::Module<T>>::extrinsic_index(),
+			);
+
+			let dna = payload.using_encoded(blake2_128);
+
+			let kitty = Kitty(dna);
+			let kitty_id = Self::next_kitty_id();
+
+			Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
+
+			NextKittyId::put(kitty_id + 1);
+
+			Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty))
+		}
 	}
 }
