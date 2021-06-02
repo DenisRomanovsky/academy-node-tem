@@ -49,6 +49,7 @@ decl_error! {
 	pub enum Error for Module<T: Trait> {
 		NoneValue,
 		StorageOverflow,
+		KittiesIdOverflow
 	}
 }
 
@@ -75,7 +76,11 @@ decl_module! {
 
 			Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
 
-			NextKittyId::put(kitty_id + 1);
+			let new_kitty_id = kitty_id
+				.checked_add(1)
+				.ok_or(Error::<T>::KittiesIdOverflow)?;
+
+			NextKittyId::put(new_kitty_id + 1);
 
 			Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty))
 		}
