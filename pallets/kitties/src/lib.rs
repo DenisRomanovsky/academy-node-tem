@@ -94,20 +94,18 @@ decl_module! {
         pub fn create(origin) {
             let sender = ensure_signed(origin)?;
 
-            let dna = Self::random_value(&sender);
+            NextKittyId::try_mutate(|next_id| -> DispatchResult {
+                *next_id = next_id.checked_add(1).ok_or(Error::<T>::KittiesIdOverflow)?;
 
-            let kitty = Kitty(dna);
-            let kitty_id = Self::next_kitty_id();
+                let dna = Self::random_value(&sender);
+                let kitty = Kitty(dna);
+                let kitty_id = Self::next_kitty_id();
 
-            Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
+                Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
+                Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty));
 
-            let new_kitty_id = kitty_id
-                .checked_add(1)
-                .ok_or(Error::<T>::KittiesIdOverflow)?;
-
-            NextKittyId::put(new_kitty_id + 1);
-
-            Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty))
+                Ok(())
+            })?;
         }
 
         #[weight = 1000]
@@ -120,9 +118,13 @@ decl_module! {
             ensure!(first_kitty.gender() != second_kitty.gender(), Error::<T>::SameGenderBreed);
 
             let mut new_kitty_dna = [0u8; 16];
+            let random_dna_selector = Self::random_value(&sender);
 
             for i in 0..new_kitty_dna.len() {
-                new_kitty_dna[i] = combine_dna(first_kitty.dna()[i], second_kitty.dna()[i], 1);
+                new_kitty_dna[i] = combine_dna(
+                    first_kitty.dna()[i],
+                    second_kitty.dna()[i],
+                    random_dna_selector[i]);
             }
 
             let kitty_id = Self::next_kitty_id();
