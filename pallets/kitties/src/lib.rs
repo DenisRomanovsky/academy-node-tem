@@ -2,7 +2,7 @@
 
 use codec::{Decode, Encode};
 use frame_support::{
-    decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure,
+    decl_error, decl_event, decl_module, decl_storage,  dispatch::{DispatchError, DispatchResult}, ensure,
     traits::Randomness, RuntimeDebug, StorageDoubleMap, StorageValue,
 };
 use frame_system::ensure_signed;
@@ -95,11 +95,9 @@ decl_module! {
             let sender = ensure_signed(origin)?;
 
             NextKittyId::try_mutate(|next_id| -> DispatchResult {
-                *next_id = next_id.checked_add(1).ok_or(Error::<T>::KittiesIdOverflow)?;
-
                 let dna = Self::random_value(&sender);
                 let kitty = Kitty(dna);
-                let kitty_id = Self::next_kitty_id();
+                let kitty_id = Self::get_next_kitty_id()?;
 
                 Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
                 Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty));
@@ -127,16 +125,9 @@ decl_module! {
                     random_dna_selector[i]);
             }
 
-            let kitty_id = Self::next_kitty_id();
+            let kitty_id = Self::get_next_kitty_id()?;
             let new_kitty = Kitty(new_kitty_dna);
             Kitties::<T>::insert(&sender, kitty_id, &new_kitty);
-
-            let new_kitty_id = kitty_id
-                .checked_add(1)
-                .ok_or(Error::<T>::KittiesIdOverflow)?;
-
-            NextKittyId::put(new_kitty_id + 1);
-
             Self::deposit_event(RawEvent::KittyBreed(sender, first_kitty, second_kitty, new_kitty))
         }
 
@@ -168,6 +159,14 @@ fn combine_dna(dna1: u8, dna2: u8, selector: u8) -> u8 {
 }
 
 impl<T: Trait> Module<T> {
+	fn get_next_kitty_id() -> sp_std::result::Result<u32, DispatchError> {
+		NextKittyId::try_mutate(|next_id| -> sp_std::result::Result<u32, DispatchError> {
+			let current_id = *next_id;
+			*next_id = next_id.checked_add(1).ok_or(Error::<T>::KittiesIdOverflow)?;
+			Ok(current_id)
+		})
+	}
+
     fn random_value(sender: &T::AccountId) -> [u8; 16] {
         let payload = (
             T::Randomness::random_seed(),
