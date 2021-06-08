@@ -9,9 +9,6 @@ use frame_system::ensure_signed;
 use sp_io::hashing::blake2_128;
 
 #[cfg(test)]
-mod mock;
-
-#[cfg(test)]
 mod tests;
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
@@ -93,17 +90,12 @@ decl_module! {
         #[weight = 1000]
         pub fn create(origin) {
             let sender = ensure_signed(origin)?;
+			let dna = Self::random_value(&sender);
+			let kitty = Kitty(dna);
+			let kitty_id = Self::get_next_kitty_id()?;
 
-            NextKittyId::try_mutate(|next_id| -> DispatchResult {
-                let dna = Self::random_value(&sender);
-                let kitty = Kitty(dna);
-                let kitty_id = Self::get_next_kitty_id()?;
-
-                Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
-                Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty));
-
-                Ok(())
-            })?;
+			Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
+			Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty));
         }
 
         #[weight = 1000]
