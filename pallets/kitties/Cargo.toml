@@ -28,7 +28,6 @@ sp-std = { version = "2.0.1", default-features = false }
 [dev-dependencies]
 sp-core = { default-features = false, version = '2.0.1' }
 sp-runtime = { default-features = false, version = '2.0.1' }
-pallet-randomness-collective-flip = { default-features = false, version = '2.0.1' }
 
 [features]
 default = ['std']

@@ -2,8 +2,11 @@
 
 use codec::{Decode, Encode};
 use frame_support::{
-    decl_error, decl_event, decl_module, decl_storage,  dispatch::{DispatchError, DispatchResult}, ensure,
-    traits::Randomness, RuntimeDebug, StorageDoubleMap, StorageValue,
+    decl_error, decl_event, decl_module, decl_storage,
+    dispatch::{DispatchError, DispatchResult},
+    ensure,
+    traits::Randomness,
+    RuntimeDebug, StorageDoubleMap, StorageValue,
 };
 use frame_system::ensure_signed;
 use sp_io::hashing::blake2_128;
@@ -22,11 +25,11 @@ pub enum KittyGender {
 
 impl Kitty {
     pub fn gender(&self) -> KittyGender {
-        if self.0[0] > 4 {
-            KittyGender::Male
-        } else {
-            KittyGender::Female
-        }
+		if self.0[0] % 2 == 0 {
+			KittyGender::Male
+		} else {
+			KittyGender::Female
+		}
     }
 
     pub fn dna(&self) -> [u8; 16] {
@@ -90,12 +93,12 @@ decl_module! {
         #[weight = 1000]
         pub fn create(origin) {
             let sender = ensure_signed(origin)?;
-			let dna = Self::random_value(&sender);
-			let kitty = Kitty(dna);
-			let kitty_id = Self::get_next_kitty_id()?;
+            let dna = Self::random_value(&sender);
+            let kitty = Kitty(dna);
+            let kitty_id = Self::get_next_kitty_id()?;
 
-			Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
-			Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty));
+            Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
+            Self::deposit_event(RawEvent::KittyCreated(sender, kitty_id, kitty));
         }
 
         #[weight = 1000]
@@ -151,13 +154,15 @@ fn combine_dna(dna1: u8, dna2: u8, selector: u8) -> u8 {
 }
 
 impl<T: Trait> Module<T> {
-	fn get_next_kitty_id() -> sp_std::result::Result<u32, DispatchError> {
-		NextKittyId::try_mutate(|next_id| -> sp_std::result::Result<u32, DispatchError> {
-			let current_id = *next_id;
-			*next_id = next_id.checked_add(1).ok_or(Error::<T>::KittiesIdOverflow)?;
-			Ok(current_id)
-		})
-	}
+    fn get_next_kitty_id() -> sp_std::result::Result<u32, DispatchError> {
+        NextKittyId::try_mutate(|next_id| -> sp_std::result::Result<u32, DispatchError> {
+            let current_id = *next_id;
+            *next_id = next_id
+                .checked_add(1)
+                .ok_or(Error::<T>::KittiesIdOverflow)?;
+            Ok(current_id)
+        })
+    }
 
     fn random_value(sender: &T::AccountId) -> [u8; 16] {
         let payload = (
