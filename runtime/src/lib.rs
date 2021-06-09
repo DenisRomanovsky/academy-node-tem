@@ -269,6 +269,14 @@ impl pallet_template::Trait for Runtime {
     type Event = Event;
 }
 
+impl orml_nft::Trait for Runtime {
+	type ClassId = u32;
+	type TokenId = u32;
+	type ClassData = ();
+	type TokenData = pallet_kitties::Kitty;
+}
+
+
 /// Configure the template pallet in pallets/template.
 impl pallet_kitties::Trait for Runtime {
     type Event = Event;
@@ -294,6 +302,7 @@ construct_runtime!(
         // Include the custom logic from the template pallet in the runtime.
         TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
         Kitties: pallet_kitties::{Module, Call, Storage, Event<T>},
+		NFT: orml_nft::{Module,Storage},
     }
 );
 
