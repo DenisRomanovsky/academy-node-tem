@@ -5,7 +5,7 @@ use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
     dispatch::{DispatchError, DispatchResult},
     ensure,
-    traits::Randomness,
+    traits::{Currency, Randomness, ExistenceRequirement},
     RuntimeDebug, StorageDoubleMap, StorageValue,
 };
 use frame_system::ensure_signed;
@@ -25,11 +25,11 @@ pub enum KittyGender {
 
 impl Kitty {
     pub fn gender(&self) -> KittyGender {
-		if self.0[0] % 2 == 0 {
-			KittyGender::Male
-		} else {
-			KittyGender::Female
-		}
+        if self.0[0] % 2 == 0 {
+            KittyGender::Male
+        } else {
+            KittyGender::Female
+        }
     }
 
     pub fn dna(&self) -> [u8; 16] {
@@ -44,7 +44,10 @@ impl Kitty {
 pub trait Trait: frame_system::Trait {
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
     type Randomness: Randomness<Self::Hash>;
+	type Currency: Currency<Self::AccountId>;
 }
+
+type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
 
 // The pallet's runtime storage items.
 // https://substrate.dev/docs/en/knowledgebase/runtime/storage
@@ -53,6 +56,8 @@ decl_storage! {
         pub Kitties get(fn kitties): double_map hasher(blake2_128_concat) T::AccountId, hasher(blake2_128_concat) u32 => Option<Kitty>;
 
         pub NextKittyId get(fn next_kitty_id): u32;
+
+        pub KittyPrices get(fn kitty_prices): map hasher(blake2_128_concat) u32 => Option<BalanceOf<T>>;
     }
 }
 
@@ -62,6 +67,7 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as frame_system::Trait>::AccountId,
+        Balance = BalanceOf<T>,
     {
         /// Kitty created. owner / kitty id / Kitty
         KittyCreated(AccountId, u32, Kitty),
@@ -69,6 +75,10 @@ decl_event!(
         KittyBreed(AccountId, Kitty, Kitty, Kitty),
         /// Kitty transferred. old owner / new owner / kitty
         KittyTransferred(AccountId, AccountId, Kitty),
+        /// Kitty price set. owner / kitty id / price
+        KittyPriceUpdated(AccountId, u32, Option<Balance>),
+        /// Kitty sold set. seller/ byer / kitty id / price
+        KittySold(AccountId, AccountId, u32, Option<Balance>),
     }
 );
 
@@ -81,6 +91,9 @@ decl_error! {
         SameGenderBreed,
         KittenNotFound,
         WrongDNA,
+        NotForSale,
+        PriceTooLow,
+        BuyFromSelf,
     }
 }
 
@@ -106,7 +119,6 @@ decl_module! {
             let sender = ensure_signed(origin)?;
             let first_kitty = Self::kitties(&sender, first_kitty_id).ok_or_else(|| Error::<T>::KittenNotFound)?;
             let second_kitty = Self::kitties(&sender, second_kitty_id).ok_or_else(|| Error::<T>::KittenNotFound)?;
-
 
             ensure!(first_kitty.gender() != second_kitty.gender(), Error::<T>::SameGenderBreed);
 
@@ -144,6 +156,39 @@ decl_module! {
                 Self::deposit_event(RawEvent::KittyTransferred(sender, new_owner_id, kitty));
 
                 Ok(())
+            })?;
+        }
+
+         #[weight = 1000]
+        pub fn set_price(origin, kitty_id: u32, new_price: Option<BalanceOf<T>>) {
+             let sender = ensure_signed(origin)?;
+
+            ensure!(<Kitties<T>>::contains_key(&sender, kitty_id), Error::<T>::KittenNotFound);
+            KittyPrices::<T>::mutate_exists(kitty_id, |price| *price = new_price);
+
+            Self::deposit_event(RawEvent::KittyPriceUpdated(sender, kitty_id, new_price));
+        }
+
+        #[weight = 1000]
+        pub fn buy(origin, owner: T::AccountId, kitty_id: u32, max_price: BalanceOf<T>) {
+             let sender = ensure_signed(origin)?;
+
+            ensure!(sender != owner, Error::<T>::BuyFromSelf);
+
+            Kitties::<T>::try_mutate_exists(owner.clone(), kitty_id, |kitty| -> DispatchResult {
+                let kitty = kitty.take().ok_or(Error::<T>::KittenNotFound)?;
+
+
+                KittyPrices::<T>::try_mutate_exists(kitty_id, |price| -> DispatchResult {
+                    let price = price.take().ok_or(Error::<T>::NotForSale)?;
+					ensure!(max_price >= price, Error::<T>::PriceTooLow);
+
+					Kitties::<T>::insert(&sender, kitty_id, kitty);
+                    T::Currency::transfer(&sender, &owner, price, ExistenceRequirement::KeepAlive)?;
+
+					Self::deposit_event(RawEvent::KittyTransferred(sender, owner, kitty));
+					Ok(())
+                } );
             })?;
         }
     }
